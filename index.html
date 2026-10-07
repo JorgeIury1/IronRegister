@@ -1,112 +1,78 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IronLog — Treinos</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ForgeLog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">I</span><span>IRON<span class="green">LOG</span></span></div>
-      <nav>
-        <button class="nav-item active" data-page="dashboard">⌂ <span>Dashboard</span></button>
-        <button class="nav-item" data-page="workouts">▣ <span>Treinos</span></button>
-        <button class="nav-item" data-page="week">◷ <span>Semana</span></button>
-        <button class="nav-item" data-page="progress">↗ <span>Progresso</span></button>
-      </nav>
-      <div class="sidebar-bottom">
-        <button id="resetData" class="ghost danger">↻ Resetar dados</button>
+<aside class="sidebar">
+  <div class="brand"><span class="brand-mark">F</span><span>ForgeLog</span></div>
+  <nav>
+    <button class="nav-item active" data-page="dashboard">Dashboard</button>
+    <button class="nav-item" data-page="workouts">Treinos</button>
+    <button class="nav-item" data-page="week">Semana</button>
+    <button class="nav-item" data-page="progress">Progressão</button>
+  </nav>
+  <button class="quick-add" id="quickAdd">＋ Registrar treino</button>
+  <div class="sidebar-bottom"><button class="danger-link" id="resetData">Resetar dados</button></div>
+</aside>
+
+<main class="main">
+<header class="mobile-header"><div class="brand"><span class="brand-mark">F</span><span>ForgeLog</span></div><button id="mobileAdd" class="icon-button">＋</button></header>
+
+<section id="dashboard" class="page active">
+  <div class="page-heading"><div><p class="eyebrow">DASHBOARD</p><h1>Treine. Registre. Evolua.</h1><p class="subtext">Seu histórico de treino, resumido em um só lugar.</p></div></div>
+  <div class="stats-grid">
+    <article class="stat-card stat-main">
+      <div class="stat-top"><span>Treinos registrados</span>
+        <select id="statPeriod"><option value="7">Última semana</option><option value="30" selected>Último mês</option><option value="180">Último semestre</option><option value="365">Último ano</option></select>
       </div>
-    </aside>
-
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">SEU TREINO</p>
-          <h1 id="pageTitle">Dashboard</h1>
-        </div>
-        <button class="primary" id="quickAdd">＋ Add treino</button>
-      </header>
-
-      <section id="dashboard" class="page active-page">
-        <div class="hero">
-          <div>
-            <p class="eyebrow green">IRONLOG</p>
-            <h2>Treine. Registre.<br><span class="green">Evolua.</span></h2>
-            <p class="muted">Acompanhe suas cargas e veja sua evolução sem complicação.</p>
-          </div>
-          <div class="hero-stat"><span>PRs registrados</span><strong id="heroPR">0</strong></div>
-        </div>
-
-        <div class="stats-grid">
-          <div class="stat-card"><span>Treinos concluídos</span><strong id="statWorkouts">0</strong><small>este período</small></div>
-          <div class="stat-card"><span>Volume total</span><strong id="statVolume">0 kg</strong><small>peso × reps</small></div>
-          <div class="stat-card"><span>Exercícios</span><strong id="statExercises">0</strong><small>cadastrados</small></div>
-          <div class="stat-card"><span>Sequência</span><strong id="statStreak">0 dias</strong><small>treinando</small></div>
-        </div>
-
-        <div class="two-col">
-          <div class="panel">
-            <div class="panel-head"><div><h3>Agenda</h3><p class="muted">Sua semana</p></div><button class="text-btn" data-page-link="week">Ver tudo →</button></div>
-            <div id="miniWeek" class="mini-week"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><div><h3>Últimos treinos</h3><p class="muted">Atividade recente</p></div><button class="text-btn" data-page-link="workouts">Ver tudo →</button></div>
-            <div id="recentList" class="recent-list"></div>
-          </div>
-        </div>
-      </section>
-
-      <section id="workouts" class="page">
-        <div class="section-head">
-          <div><h2>Seus treinos</h2><p class="muted">Organize até 6 divisões diferentes.</p></div>
-        </div>
-        <div id="workoutCards" class="workout-grid"></div>
-      </section>
-
-      <section id="week" class="page">
-        <div class="section-head">
-          <div><h2>Semana</h2><p class="muted">Monte sua rotina e registre o treino do dia.</p></div>
-        </div>
-        <div id="weekGrid" class="week-grid"></div>
-      </section>
-
-      <section id="progress" class="page">
-        <div class="section-head">
-          <div><h2>Progresso</h2><p class="muted">Veja como suas cargas estão evoluindo.</p></div>
-          <select id="exerciseSelect" class="select"></select>
-        </div>
-        <div class="chart-panel">
-          <canvas id="progressChart"></canvas>
-          <div id="chartEmpty" class="empty-chart">Registre pelo menos duas sessões do mesmo exercício para ver a evolução.</div>
-        </div>
-        <div class="two-col">
-          <div class="panel">
-            <div class="panel-head"><div><h3>Recordes pessoais</h3><p class="muted">Maior carga registrada</p></div></div>
-            <div id="prsList"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><div><h3>Volume por sessão</h3><p class="muted">Peso × repetições</p></div></div>
-            <div id="volumeList"></div>
-          </div>
-        </div>
-      </section>
-    </main>
+      <strong id="statWorkouts">0</strong><small id="statPeriodLabel">nos últimos 30 dias</small>
+    </article>
+    <article class="stat-card"><span>Dias ativos</span><strong id="statActiveDays">0</strong><small>dias com pelo menos 1 registro</small></article>
+    <article class="stat-card"><span>Volume médio / semana</span><strong id="statAvgVolume">0 kg</strong><small id="statAvgVolumeLabel">no período selecionado</small></article>
   </div>
+  <div class="section-heading"><div><p class="eyebrow">RECENTES</p><h2>Últimos registros</h2></div><button class="text-button" data-page-link="progress">Ver progressão →</button></div>
+  <div id="recentSessions" class="session-list"></div>
+</section>
 
-  <div id="modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-card">
-      <button class="modal-close" id="closeModal">×</button>
-      <div id="modalContent"></div>
+<section id="workouts" class="page">
+  <div class="page-heading"><div><p class="eyebrow">TREINOS</p><h1>Seus treinos</h1><p class="subtext">Crie sua própria divisão e registre quando quiser.</p></div><button class="primary-button" id="createWorkout">＋ Criar treino</button></div>
+  <div id="workoutCards" class="workout-grid"></div>
+</section>
+
+<section id="week" class="page">
+  <div class="page-heading"><div><p class="eyebrow">SEMANA</p><h1>Agenda de treinos</h1><p class="subtext">Escolha um treino para cada dia e registre sua sessão.</p></div></div>
+  <div id="weekGrid" class="week-grid"></div>
+</section>
+
+<section id="progress" class="page">
+  <div class="page-heading"><div><p class="eyebrow">PROGRESSÃO</p><h1>Progressão</h1><p class="subtext">Veja volume, frequência e seus padrões de treino.</p></div></div>
+  <article class="chart-card">
+    <div class="chart-heading"><div><h2>Volume semanal</h2><p>Volume total ou de um exercício específico.</p></div>
+      <div class="chart-controls">
+        <select id="volumeType"><option value="total">Volume total</option><option value="exercise">Exercício específico</option></select>
+        <select id="volumeExercise" class="hidden"></select>
+        <select id="volumeRange"><option value="30">Mês</option><option value="180" selected>Semestre</option><option value="365">Ano</option></select>
+      </div>
     </div>
+    <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
+  </article>
+  <div class="charts-two">
+    <article class="chart-card"><div class="chart-heading"><div><h2>Frequência por mês</h2><p>Número de dias treinados.</p></div>
+      <select id="monthFrequencyRange"><option value="3" selected>3 meses</option><option value="12">12 meses</option></select></div>
+      <div class="chart-wrap small"><canvas id="monthChart"></canvas></div>
+    </article>
+    <article class="chart-card"><div class="chart-heading"><div><h2>Frequência por dia</h2><p>Em quais dias você mais treina.</p></div></div>
+      <div class="chart-wrap small"><canvas id="weekdayChart"></canvas></div>
+    </article>
   </div>
-  <script src="app.js"></script>
-</body>
-</html>
+</section>
+</main>
+
+<div class="modal-backdrop hidden" id="modalBackdrop"><div class="modal" id="modal"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script src="app.js"></script>
+</body></html>

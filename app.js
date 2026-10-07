@@ -1,131 +1,45 @@
-const KEY = "ironlog_v1";
-const days = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-const defaultData = {
-  workouts: {
-    A:{name:"Treino A", exercises:["Supino reto","Remada baixa","Elevação lateral"]},
-    B:{name:"Treino B", exercises:["Agachamento","Leg press","Mesa flexora"]},
-    C:{name:"Treino C", exercises:["Desenvolvimento","Puxada alta","Rosca direta"]},
-    D:{name:"Treino D", exercises:[]}, E:{name:"Treino E", exercises:[]}, F:{name:"Treino F", exercises:[]}
-  },
-  schedule:{}, sessions:[]
-};
-let data = JSON.parse(localStorage.getItem(KEY) || "null") || structuredClone(defaultData);
-let chart;
-
-function save(){localStorage.setItem(KEY,JSON.stringify(data));}
-function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
-function today(){return new Date();}
-function isoDate(d){return d.toISOString().slice(0,10);}
-function getDayKey(date){return isoDate(date);}
-function showPage(id){
-  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active-page"));
-  document.getElementById(id).classList.add("active-page");
-  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===id));
-  document.getElementById("pageTitle").textContent={dashboard:"Dashboard",workouts:"Treinos",week:"Semana",progress:"Progresso"}[id];
-  if(id==="dashboard") renderDashboard();
-  if(id==="workouts") renderWorkouts();
-  if(id==="week") renderWeek();
-  if(id==="progress") renderProgress();
-}
-document.querySelectorAll(".nav-item").forEach(b=>b.onclick=()=>showPage(b.dataset.page));
-document.querySelectorAll("[data-page-link]").forEach(b=>b.onclick=()=>showPage(b.dataset.pageLink));
-
-function openModal(html){document.getElementById("modalContent").innerHTML=html;document.getElementById("modal").classList.remove("hidden");}
-function closeModal(){document.getElementById("modal").classList.add("hidden");}
-document.getElementById("closeModal").onclick=closeModal;
-document.querySelector(".modal-backdrop").onclick=closeModal;
-
-function renderDashboard(){
-  const sessions=data.sessions;
-  const volume=sessions.reduce((a,s)=>a+s.sets.reduce((x,z)=>x+(+z.weight||0)*(+z.reps||0),0),0);
-  const exerciseSet=new Set(Object.values(data.workouts).flatMap(w=>w.exercises));
-  const prs={}; sessions.forEach(s=>s.sets.forEach(z=>{prs[z.exercise]=Math.max(prs[z.exercise]||0,+z.weight||0)}));
-  document.getElementById("statWorkouts").textContent=sessions.length;
-  document.getElementById("statVolume").textContent=Math.round(volume).toLocaleString("pt-BR")+" kg";
-  document.getElementById("statExercises").textContent=exerciseSet.size;
-  document.getElementById("heroPR").textContent=Object.keys(prs).length;
-  document.getElementById("statStreak").textContent=calcStreak()+" dias";
-  const now=today(), start=new Date(now); start.setDate(now.getDate()-now.getDay());
-  let html="";
-  for(let i=0;i<7;i++){let d=new Date(start);d.setDate(start.getDate()+i);let k=isoDate(d), a=data.schedule[k];
-    html+=`<div class="day-mini ${isoDate(now)===k?"today":""}"><div class="day-name">${days[d.getDay()]}</div><div class="day-number">${d.getDate()}</div><div class="day-workout">${a?esc(data.workouts[a]?.name||a):"—"}</div></div>`;
-  }
-  document.getElementById("miniWeek").innerHTML=html;
-  const recent=[...sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
-  document.getElementById("recentList").innerHTML=recent.length?recent.map(s=>`<div class="recent-item"><div><div class="item-title">${esc(s.workoutName)}</div><div class="item-sub">${formatDate(s.date)} · ${s.sets.length} séries</div></div><span class="badge">${Math.round(s.sets.reduce((x,z)=>x+(+z.weight||0)*(+z.reps||0),0))} kg</span></div>`).join(""):`<div class="empty">Nenhum treino registrado ainda.</div>`;
-}
-function calcStreak(){let set=new Set(data.sessions.map(s=>s.date));let d=today(), count=0;if(!set.has(isoDate(d)))d.setDate(d.getDate()-1);while(set.has(isoDate(d))){count++;d.setDate(d.getDate()-1)}return count;}
-function formatDate(s){return new Date(s+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});}
-
-function renderWorkouts(){
-  document.getElementById("workoutCards").innerHTML=Object.entries(data.workouts).map(([key,w])=>`
-    <div class="workout-card">
-      <div class="workout-letter">TREINO ${key}</div><h3>${esc(w.name)}</h3>
-      <div class="exercise-count">${w.exercises.length} exercício${w.exercises.length===1?"":"s"}</div>
-      <div class="card-actions"><button class="secondary" onclick="editWorkout('${key}')">Editar</button><button class="primary" onclick="startWorkout('${key}')">Registrar</button></div>
-    </div>`).join("");
-}
-function editWorkout(key){
-  const w=data.workouts[key];
-  openModal(`<p class="eyebrow green">TREINO ${key}</p><h2>Editar exercícios</h2>
-    <div class="field"><label>NOME</label><input id="wname" value="${esc(w.name)}"></div>
-    <div id="exerciseEdit">${w.exercises.map((e,i)=>`<div class="exercise-row"><div class="set-row"><input class="ex-name" value="${esc(e)}"><button class="remove" onclick="this.closest('.exercise-row').remove()">×</button></div></div>`).join("")}</div>
-    <button class="secondary" onclick="addExerciseEdit()">＋ Adicionar exercício</button>
-    <div class="modal-footer"><button class="secondary" onclick="closeModal()">Cancelar</button><button class="primary" onclick="saveWorkout('${key}')">Salvar</button></div>`);
-}
-function addExerciseEdit(){document.getElementById("exerciseEdit").insertAdjacentHTML("beforeend",`<div class="exercise-row"><div class="set-row"><input class="ex-name" placeholder="Nome do exercício"><button class="remove" onclick="this.closest('.exercise-row').remove()">×</button></div></div>`);}
-function saveWorkout(key){data.workouts[key].name=document.getElementById("wname").value.trim()||`Treino ${key}`;data.workouts[key].exercises=[...document.querySelectorAll(".ex-name")].map(x=>x.value.trim()).filter(Boolean);save();closeModal();renderWorkouts();}
-
-function startWorkout(key,date=isoDate(today())){
-  const w=data.workouts[key];
-  if(!w.exercises.length){editWorkout(key);return;}
-  const rows=w.exercises.map((e,i)=>`<div class="exercise-row"><div class="exercise-top"><strong>${esc(e)}</strong><button class="secondary" onclick="addSet(${i})">＋ série</button></div><div id="sets-${i}"><div class="set-row"><input type="number" min="0" step=".5" placeholder="Peso (kg)"><input type="number" min="0" step="1" placeholder="Reps"><button class="remove" onclick="this.parentElement.remove()">×</button></div></div></div>`).join("");
-  openModal(`<p class="eyebrow green">${esc(w.name)}</p><h2>Registrar treino</h2><div class="muted">Data: ${formatDate(date)}</div><div id="sessionExercises">${rows}</div>
-    <div class="modal-footer"><button class="secondary" onclick="closeModal()">Cancelar</button><button class="primary" onclick="saveSession('${key}','${date}')">Concluir treino</button></div>`);
-}
-function addSet(i){document.getElementById(`sets-${i}`).insertAdjacentHTML("beforeend",`<div class="set-row"><input type="number" min="0" step=".5" placeholder="Peso (kg)"><input type="number" min="0" step="1" placeholder="Reps"><button class="remove" onclick="this.parentElement.remove()">×</button></div>`);}
-function saveSession(key,date){
-  const sets=[];document.querySelectorAll("#sessionExercises .exercise-row").forEach((row)=>{
-    const exercise=row.querySelector("strong").textContent;
-    row.querySelectorAll(".set-row").forEach(r=>{const inputs=r.querySelectorAll("input"),weight=+inputs[0].value,reps=+inputs[1].value;if(weight>0&&reps>0)sets.push({exercise,weight,reps});});
-  });
-  if(!sets.length){alert("Registre pelo menos uma série.");return;}
-  data.sessions.push({id:Date.now(),date,workout:key,workoutName:data.workouts[key].name,sets});save();closeModal();renderDashboard();
-  alert("Treino salvo! 💪");
-}
-function renderWeek(){
-  const now=today(), start=new Date(now);start.setDate(now.getDate()-now.getDay());
-  let html="";
-  for(let i=0;i<7;i++){let d=new Date(start);d.setDate(start.getDate()+i);let k=isoDate(d), assigned=data.schedule[k];
-    html+=`<div class="week-day ${isoDate(now)===k?"today":""}"><h3>${days[d.getDay()]}</h3><div class="date">${d.getDate()}</div>
-      ${assigned?`<div class="assigned"><strong>${assigned}</strong><span>${esc(data.workouts[assigned]?.name||"Treino")}</span></div><button class="primary" style="width:100%;font-size:11px;padding:9px" onclick="startWorkout('${assigned}','${k}')">Registrar</button><button class="add-day" style="margin-top:7px" onclick="chooseWorkout('${k}')">Trocar treino</button>`:`<button class="add-day" onclick="chooseWorkout('${k}')">＋ Add treino</button>`}</div>`;
-  }
-  document.getElementById("weekGrid").innerHTML=html;
-}
-function chooseWorkout(date){
-  openModal(`<p class="eyebrow green">AGENDA</p><h2>Adicionar treino</h2><p class="muted">${formatDate(date)}</p><div class="field"><label>ESCOLHA O TREINO</label><select id="chooseWorkout">${Object.entries(data.workouts).map(([k,w])=>`<option value="${k}">${k} — ${esc(w.name)}</option>`).join("")}</select></div><div class="modal-footer"><button class="secondary" onclick="closeModal()">Cancelar</button><button class="primary" onclick="assignWorkout('${date}')">Adicionar</button></div>`);
-}
-function assignWorkout(date){data.schedule[date]=document.getElementById("chooseWorkout").value;save();closeModal();renderWeek();renderDashboard();}
-
-function allExercises(){return [...new Set(Object.values(data.workouts).flatMap(w=>w.exercises))];}
-function renderProgress(){
-  const sel=document.getElementById("exerciseSelect"), old=sel.value, ex=allExercises();
-  sel.innerHTML=ex.length?ex.map(e=>`<option value="${esc(e)}">${esc(e)}</option>`).join(""):`<option>Sem exercícios</option>`;
-  if(ex.includes(old))sel.value=old;
-  sel.onchange=drawChart; drawChart();
-  const prs={};data.sessions.forEach(s=>s.sets.forEach(z=>prs[z.exercise]=Math.max(prs[z.exercise]||0,+z.weight||0)));
-  document.getElementById("prsList").innerHTML=Object.entries(prs).sort((a,b)=>b[1]-a[1]).map(([e,v])=>`<div class="pr-item"><span class="item-title">${esc(e)}</span><strong class="green">${v} kg</strong></div>`).join("")||`<div class="empty">Nenhum PR ainda.</div>`;
-  const vols=[...data.sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,7);
-  document.getElementById("volumeList").innerHTML=vols.map(s=>`<div class="volume-item"><span><span class="item-title">${esc(s.workoutName)}</span><div class="item-sub">${formatDate(s.date)}</div></span><strong>${Math.round(s.sets.reduce((x,z)=>x+z.weight*z.reps,0))} kg</strong></div>`).join("")||`<div class="empty">Nenhuma sessão.</div>`;
-}
-function drawChart(){
-  const ex=document.getElementById("exerciseSelect").value, points=[];
-  data.sessions.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(s=>{const rows=s.sets.filter(z=>z.exercise===ex);if(rows.length)points.push({x:formatDate(s.date),y:Math.max(...rows.map(z=>+z.weight))})});
-  const empty=document.getElementById("chartEmpty");empty.style.display=points.length<2?"grid":"none";
-  if(chart)chart.destroy();
-  chart=new Chart(document.getElementById("progressChart"),{type:"line",data:{labels:points.map(p=>p.x),datasets:[{label:"Maior peso (kg)",data:points.map(p=>p.y),borderColor:"#39e875",backgroundColor:"#39e87518",tension:.35,fill:true,pointRadius:4,pointBackgroundColor:"#39e875"}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#849089"}}},scales:{x:{ticks:{color:"#849089"},grid:{color:"#172019"}},y:{ticks:{color:"#849089"},grid:{color:"#172019"}}}}});
-}
-
-document.getElementById("quickAdd").onclick=()=>chooseWorkout(isoDate(today()));
-document.getElementById("resetData").onclick=()=>{if(confirm("Isso apagará todos os seus registros. Continuar?")){localStorage.removeItem(KEY);data=structuredClone(defaultData);showPage("dashboard");}};
-renderDashboard();
+const KEY="forgelog_v1";
+let state=load(), volumeChart, monthChart, weekdayChart;
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||{workouts:[],schedule:{},sessions:[]}}catch{return {workouts:[],schedule:{},sessions:[]}}}
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+const $=id=>document.getElementById(id);
+const today=()=>new Date().toISOString().slice(0,10);
+function date(s){let [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
+function iso(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).toISOString().slice(0,10)}
+function add(d,n){let x=new Date(d);x.setDate(x.getDate()+n);return x}
+function fmt(s){return date(s).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"})}
+function workout(id){return state.workouts.find(w=>w.id===id)}
+function exercises(){return [...new Set(state.workouts.flatMap(w=>w.exercises||[]))].sort((a,b)=>a.localeCompare(b,"pt-BR"))}
+function volume(s,ex){return (s.sets||[]).reduce((a,x)=>a+((!ex||x.exercise===ex)?(Number(x.weight)||0)*(Number(x.reps)||0):0),0)}
+function inPeriod(days){let end=new Date();let start=add(new Date(end.getFullYear(),end.getMonth(),end.getDate()),-(days-1));return state.sessions.filter(s=>date(s.date)>=start)}
+function active(s){return new Set(s.map(x=>x.date)).size}
+function show(p){document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===p));document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===p));if(p==="progress")renderProgress()}
+document.querySelectorAll(".nav-item").forEach(b=>b.onclick=()=>show(b.dataset.page));
+document.querySelectorAll("[data-page-link]").forEach(b=>b.onclick=()=>show(b.dataset.pageLink));
+$("statPeriod").onchange=renderStats;$("volumeType").onchange=renderProgress;$("volumeExercise").onchange=renderProgress;$("volumeRange").onchange=renderProgress;$("monthFrequencyRange").onchange=renderProgress;
+$("createWorkout").onclick=()=>openWorkout();$("quickAdd").onclick=registerPicker;$("mobileAdd").onclick=registerPicker;
+$("resetData").onclick=()=>{if(confirm("Apagar todos os dados deste navegador?")){localStorage.removeItem(KEY);location.reload()}};
+function renderStats(){let d=+$("statPeriod").value,s=inPeriod(d),v=s.reduce((a,x)=>a+volume(x),0);$("statWorkouts").textContent=s.length;$("statPeriodLabel").textContent="nos últimos "+d+" dias";$("statActiveDays").textContent=active(s);$("statAvgVolume").textContent=Math.round(v/(d/7)).toLocaleString("pt-BR")+" kg";$("statAvgVolumeLabel").textContent="média aproximada no período")}
+function renderRecent(){let box=$("recentSessions"),s=[...state.sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);box.innerHTML=s.length?s.map(x=>`<div class="session-row"><div><div class="session-title">${esc(x.workoutName)}</div><div class="session-meta">${fmt(x.date)} · ${x.sets.length} séries</div></div><div class="session-volume">${Math.round(volume(x)).toLocaleString("pt-BR")} kg</div></div>`).join(""):`<div class="empty">Nenhum treino registrado ainda. Crie seu primeiro treino em <b>Treinos</b>.</div>`}
+function renderWorkouts(){let b=$("workoutCards");if(!state.workouts.length){b.innerHTML='<div class="empty" style="grid-column:1/-1"><strong>Nenhum treino criado</strong><br><br><button class="primary-button" onclick="openWorkout()">＋ Criar</button></div>';return}b.innerHTML=state.workouts.map(w=>`<article class="workout-card"><div class="workout-card-top"><div><h3>${esc(w.name)}</h3><p>${w.exercises.length} exercício${w.exercises.length!==1?"s":""}</p></div></div><ul class="exercise-list">${w.exercises.map(e=>`<li>${esc(e)}</li>`).join("")}</ul><div class="card-actions"><button class="small-button primary" onclick="openRegister('${w.id}')">Registrar</button><button class="small-button" onclick="openWorkout('${w.id}')">Editar</button></div></article>`).join("")}
+function renderWeek(){let b=$("weekGrid"),names=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"],n=new Date(),sun=add(new Date(n.getFullYear(),n.getMonth(),n.getDate()),-n.getDay());b.innerHTML=Array.from({length:7},(_,i)=>{let d=add(sun,i),s=iso(d),ids=state.schedule[s]||[];return `<article class="day-card"><div class="day-name">${names[i]}</div><div class="day-date">${d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}</div>${ids.map(id=>{let w=workout(id);return w?`<div class="scheduled"><strong>${esc(w.name)}</strong><span>${w.exercises.length} exercícios</span></div>`:""}).join("")}<button class="day-add" onclick="schedule('${s}')">＋ Add treino</button></article>`}).join("")}
+function modal(html){$("modalBackdrop").classList.remove("hidden");$("modal").innerHTML=html}
+function closeModal(){$("modalBackdrop").classList.add("hidden");$("modal").innerHTML=""}
+$("modalBackdrop").onclick=e=>{if(e.target.id==="modalBackdrop")closeModal()}
+function openWorkout(id){let w=id?workout(id):null;modal(`<button class="modal-close" onclick="closeModal()">×</button><h2>${w?"Editar treino":"Criar treino"}</h2><p class="modal-sub">Escolha o nome e os exercícios.</p><div class="form-grid"><div class="form-field"><label>NOME</label><input id="wname" value="${w?esc(w.name):""}" placeholder="Ex.: Peito e tríceps"></div><div class="form-field"><label>EXERCÍCIOS</label><div id="builder">${(w?w.exercises:[""]).map((e,i)=>`<div class="exercise-builder-row"><input class="ein" value="${esc(e)}" placeholder="Ex.: Supino reto">${i?'<button class="small-button" onclick="this.parentElement.remove()">×</button>':'<span></span>'}</div>`).join("")}</div><button class="secondary-button" onclick="addEx()">＋ Adicionar exercício</button></div></div><div class="modal-actions">${w?`<button class="secondary-button" onclick="delWorkout('${id}')">Excluir</button>`:""}<button class="secondary-button" onclick="closeModal()">Cancelar</button><button class="primary-button" onclick="saveWorkout('${id||""}')">Salvar</button></div>`)}
+function addEx(){$("builder").insertAdjacentHTML("beforeend",`<div class="exercise-builder-row"><input class="ein" placeholder="Ex.: Supino reto"><button class="small-button" onclick="this.parentElement.remove()">×</button></div>`)}
+function saveWorkout(id){let name=$("wname").value.trim(),ex=[...document.querySelectorAll(".ein")].map(x=>x.value.trim()).filter(Boolean);if(!name||!ex.length){alert("Informe o nome e pelo menos um exercício.");return}if(id){let w=workout(id);w.name=name;w.exercises=ex}else state.workouts.push({id:crypto.randomUUID(),name,exercises:ex});save();closeModal();renderAll()}
+function delWorkout(id){if(confirm("Excluir este treino? Os registros antigos continuarão salvos.")){state.workouts=state.workouts.filter(w=>w.id!==id);save();closeModal();renderAll()}}
+function registerPicker(){if(!state.workouts.length){openWorkout();return}modal(`<button class="modal-close" onclick="closeModal()">×</button><h2>Registrar treino</h2><p class="modal-sub">Escolha o treino feito hoje.</p><div class="form-grid">${state.workouts.map(w=>`<button class="secondary-button" style="text-align:left;padding:14px" onclick="closeModal();openRegister('${w.id}')"><b>${esc(w.name)}</b><br><small>${w.exercises.length} exercícios</small></button>`).join("")}</div>`)}
+function openRegister(id){let w=workout(id);modal(`<button class="modal-close" onclick="closeModal()">×</button><h2>Registrar — ${esc(w.name)}</h2><p class="modal-sub">Registre peso e repetições por série.</p><div id="sets">${w.exercises.map(e=>`<div class="form-field" style="margin-bottom:16px"><label>${esc(e)}</label><div class="sets-list" data-ex="${esc(e)}"><div class="set-row"><input class="weight" type="number" min="0" step=".5" placeholder="Peso (kg)"><input class="reps" type="number" min="0" placeholder="Reps"><button class="small-button" onclick="this.parentElement.remove()">×</button></div></div><button class="secondary-button add-set" onclick="addSet(this)">＋ Série</button></div>`).join("")}</div><div class="modal-actions"><button class="secondary-button" onclick="closeModal()">Cancelar</button><button class="primary-button" onclick="saveSession('${id}')">Salvar treino</button></div>`)}
+function addSet(b){b.previousElementSibling.insertAdjacentHTML("beforeend",`<div class="set-row"><input class="weight" type="number" min="0" step=".5" placeholder="Peso (kg)"><input class="reps" type="number" min="0" placeholder="Reps"><button class="small-button" onclick="this.parentElement.remove()">×</button></div>`)}
+function saveSession(id){let w=workout(id),sets=[];document.querySelectorAll(".sets-list").forEach(l=>l.querySelectorAll(".set-row").forEach(r=>{let reps=+r.querySelector(".reps").value,weight=+r.querySelector(".weight").value||0;if(reps>0)sets.push({exercise:l.dataset.ex,weight,reps})}));if(!sets.length){alert("Registre pelo menos uma série.");return}state.sessions.push({id:crypto.randomUUID(),date:today(),workout:id,workoutName:w.name,sets});save();closeModal();renderAll()}
+function schedule(day){if(!state.workouts.length){openWorkout();return}modal(`<button class="modal-close" onclick="closeModal()">×</button><h2>Add treino</h2><p class="modal-sub">${fmt(day)}</p><div class="form-grid">${state.workouts.map(w=>`<button class="secondary-button" style="text-align:left;padding:14px" onclick="addSchedule('${day}','${w.id}')">${esc(w.name)}</button>`).join("")}</div>`)}
+function addSchedule(day,id){state.schedule[day]=state.schedule[day]||[];if(!state.schedule[day].includes(id))state.schedule[day].push(id);save();closeModal();renderWeek()}
+function weekly(range,ex){let end=new Date(),start=add(new Date(end.getFullYear(),end.getMonth(),end.getDate()),-(range-1)),first=add(start,-start.getDay()),a=[];for(let d=new Date(first);d<=end;d=add(d,7)){let s=iso(d),e=iso(add(d,6)),v=state.sessions.filter(x=>x.date>=s&&x.date<=e).reduce((z,x)=>z+volume(x,ex),0);a.push({l:`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`,v})}return a.slice(-Math.ceil(range/7))}
+function renderProgress(){let es=exercises(),type=$("volumeType").value,sel=$("volumeExercise"),old=sel.value;sel.classList.toggle("hidden",type!=="exercise");sel.innerHTML=es.length?es.map(e=>`<option>${esc(e)}</option>`).join(""):"<option>Nenhum</option>";if(es.includes(old))sel.value=old;let data=weekly(+$("volumeRange").value,type==="exercise"?sel.value:null),common={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#8290a8"},grid:{color:"rgba(255,255,255,.04)"}},y:{ticks:{color:"#8290a8"},grid:{color:"rgba(255,255,255,.06)"}}}};if(volumeChart)volumeChart.destroy();volumeChart=new Chart($("volumeChart"),{type:"line",data:{labels:data.map(x=>x.l),datasets:[{data:data.map(x=>Math.round(x.v)),borderColor:"#4da3ff",backgroundColor:"rgba(77,163,255,.1)",fill:true,tension:.3,pointRadius:3}]},options:common});renderMonths();renderWeekdays()}
+function renderMonths(){let n=+$("monthFrequencyRange").value,now=new Date(),labels=[],vals=[];for(let i=n-1;i>=0;i--){let d=new Date(now.getFullYear(),now.getMonth()-i,1),y=d.getFullYear(),m=d.getMonth();labels.push(d.toLocaleDateString("pt-BR",{month:"short",year:"2-digit"}));vals.push(new Set(state.sessions.filter(s=>{let x=date(s.date);return x.getFullYear()===y&&x.getMonth()===m}).map(s=>s.date)).size)}if(monthChart)monthChart.destroy();monthChart=new Chart($("monthChart"),{type:"bar",data:{labels,datasets:[{data:vals,backgroundColor:"#2f80ed",borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#8290a8"},grid:{display:false}},y:{beginAtZero:true,ticks:{color:"#8290a8",precision:0}}}}})}
+function renderWeekdays(){let names=["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"],v=Array(7).fill(0);new Set(state.sessions.map(s=>s.date)).forEach(s=>v[date(s).getDay()]++);if(weekdayChart)weekdayChart.destroy();weekdayChart=new Chart($("weekdayChart"),{type:"bar",data:{labels:names,datasets:[{data:v,backgroundColor:"#2f80ed",borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#8290a8"},grid:{display:false}},y:{beginAtZero:true,ticks:{color:"#8290a8",precision:0}}}}})}
+function renderAll(){renderStats();renderRecent();renderWorkouts();renderWeek();if($("progress").classList.contains("active"))renderProgress()}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+renderAll();
